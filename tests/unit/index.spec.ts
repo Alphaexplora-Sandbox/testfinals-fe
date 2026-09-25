@@ -1,9 +1,12 @@
 import http from 'http';
-import { SERVICE_NAME, generateHtml, startServer } from '../../src/index';
+import defaultHandler, { SERVICE_NAME, generateHtml, startServer, handleRequest } from '../../src/index';
 
 describe('testfinals-frontend and server', () => {
-  it('should export SERVICE_NAME', () => {
+  it('should export SERVICE_NAME and default function handler', () => {
     expect(SERVICE_NAME).toBe('testfinals-frontend');
+    expect(typeof defaultHandler).toBe('function');
+    expect(typeof handleRequest).toBe('function');
+    expect(defaultHandler).toBe(handleRequest);
   });
 
   it('generates HTML for different initial paths', () => {
