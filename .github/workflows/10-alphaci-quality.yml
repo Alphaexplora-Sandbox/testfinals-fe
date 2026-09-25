@@ -174,19 +174,21 @@ jobs:
             COVERAGE_THRESHOLD=90
             FAIL_ON_WARNING=true
             SONAR_GATE_WAIT=true
+            SONAR_ENABLED="$SONAR_CONFIGURED"
           else
             COVERAGE_THRESHOLD=80
             FAIL_ON_WARNING=false
             SONAR_GATE_WAIT=false
+            SONAR_ENABLED=false
           fi
           {
             echo "branch=$BRANCH"
             echo "coverage-threshold=$COVERAGE_THRESHOLD"
             echo "fail-on-warning=$FAIL_ON_WARNING"
-            echo "sonar-enabled=$SONAR_CONFIGURED"
+            echo "sonar-enabled=$SONAR_ENABLED"
             echo "sonar-gate-wait=$SONAR_GATE_WAIT"
           } >> "$GITHUB_OUTPUT"
-          echo "Branch policy: branch=$BRANCH coverage>=$COVERAGE_THRESHOLD failOnWarning=$FAIL_ON_WARNING sonar=$SONAR_CONFIGURED gateWait=$SONAR_GATE_WAIT"
+          echo "Branch policy: branch=$BRANCH coverage>=$COVERAGE_THRESHOLD failOnWarning=$FAIL_ON_WARNING sonar=$SONAR_ENABLED gateWait=$SONAR_GATE_WAIT"
   frontend-tests:
     needs:
       - pipeline-context
