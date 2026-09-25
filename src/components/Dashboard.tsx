@@ -707,7 +707,7 @@ function CreateShipmentModal({
             <button
               type="submit"
               className="primary-btn"
-              data-testid="btn-submit-shipment"
+              data-testid="submit-new-shipment"
             >
               Issue Waybill
             </button>
