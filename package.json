@@ -1,8 +1,10 @@
 {
   "name": "testfinals-frontend",
   "version": "0.1.0",
+  "license": "MIT",
+  "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/render-static.js",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "test": "jest",
