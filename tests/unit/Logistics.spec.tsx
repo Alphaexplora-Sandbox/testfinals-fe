@@ -17,8 +17,15 @@ const mockSelect = (val: string) =>
 const mockForm = () =>
   ({ preventDefault: jest.fn() } as unknown as React.FormEvent);
 
-const mockBtnWithAttr = <T extends HTMLElement = HTMLButtonElement>(attrName: string, attrVal: string | null) =>
-  ({ currentTarget: { getAttribute: (key: string) => (key === attrName ? attrVal : null) } } as unknown as React.MouseEvent<T>);
+const mockBtnWithAttr = <T extends HTMLElement = HTMLButtonElement>(attrName: string, attrVal: string | null) => {
+  const camelKey = attrName.replace(/^data-/, '');
+  return {
+    currentTarget: {
+      getAttribute: (key: string) => (key === attrName ? attrVal : null),
+      dataset: { [camelKey]: attrVal ?? undefined },
+    },
+  } as unknown as React.MouseEvent<T>;
+};
 
 describe('Logistics Platform Components', () => {
   it('renders the LandingPage with tracking input, suggestions, and metrics', () => {
@@ -597,7 +604,7 @@ describe('Logistics API Client', () => {
       } as Response),
     );
     const liveVehicles = await apiClient.getVehicles();
-    expect(liveVehicles.length).toBe(vehicles.length);
+    expect(liveVehicles).toHaveLength(vehicles.length);
 
     jest.spyOn(global, 'fetch').mockImplementationOnce(() =>
       Promise.resolve({
@@ -606,6 +613,6 @@ describe('Logistics API Client', () => {
       } as Response),
     );
     const liveWarehouses = await apiClient.getWarehouses();
-    expect(liveWarehouses.length).toBe(warehouses.length);
+    expect(liveWarehouses).toHaveLength(warehouses.length);
   });
 });

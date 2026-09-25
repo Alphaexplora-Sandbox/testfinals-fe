@@ -1,16 +1,18 @@
 import React from 'react';
 import { UserProfile } from '../types/logistics';
 
+export type AppView = 'landing' | 'login' | 'dashboard';
+
 export interface NavigationProps {
-  currentView: 'landing' | 'login' | 'dashboard';
-  onNavigate: (view: 'landing' | 'login' | 'dashboard') => void;
+  currentView: AppView;
+  onNavigate: (view: AppView) => void;
   currentUser: UserProfile | null;
   onLogout: () => void;
   isBackendConnected: boolean;
   serviceTitle?: string;
 }
 
-export const createNavHandlers = (onNavigate: (view: 'landing' | 'login' | 'dashboard') => void) => ({
+export const createNavHandlers = (onNavigate: (view: AppView) => void) => ({
   toLanding: () => onNavigate('landing'),
   toDashboard: () => onNavigate('dashboard'),
   toLogin: () => onNavigate('login'),
@@ -20,24 +22,32 @@ export const NavigationActions = {
   createHandlers: createNavHandlers,
 };
 
-export function Navigation({
-  currentView,
-  onNavigate,
-  currentUser,
-  onLogout,
-  isBackendConnected,
-  serviceTitle = 'LogiPulse',
-}: NavigationProps) {
+export function Navigation(props: Readonly<NavigationProps>) {
+  const {
+    currentView,
+    onNavigate,
+    currentUser,
+    onLogout,
+    isBackendConnected,
+    serviceTitle = 'LogiPulse',
+  } = props;
   const handlers = createNavHandlers(onNavigate);
 
   return (
     <header className="header-nav" data-testid="main-header">
-      <div
+      <button
+        type="button"
         className="brand-badge"
         onClick={handlers.toLanding}
-        role="button"
-        tabIndex={0}
         data-testid="brand-logo"
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          textAlign: 'left',
+          color: 'inherit',
+        }}
       >
         <div className="brand-logo-icon">LP</div>
         <div>
@@ -46,7 +56,7 @@ export function Navigation({
             Enterprise Logistics Cloud
           </div>
         </div>
-      </div>
+      </button>
 
       <nav className="nav-links">
         <button
