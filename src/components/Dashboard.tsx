@@ -14,35 +14,91 @@ import { INITIAL_ANALYTICS, INITIAL_SHIPMENTS, INITIAL_VEHICLES, INITIAL_WAREHOU
 
 export interface DashboardProps {
   currentUser?: UserProfile | null;
+  initialTab?: 'shipments' | 'fleet' | 'warehouses';
+  initialSelectedShipment?: Shipment | null;
+  initialCreateModalOpen?: boolean;
 }
 
-export function Dashboard({ currentUser }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'shipments' | 'fleet' | 'warehouses'>('shipments');
-  const [analytics, setAnalytics] = useState<LogisticsAnalytics>(INITIAL_ANALYTICS);
-  const [shipments, setShipments] = useState<Shipment[]>(INITIAL_SHIPMENTS);
-  const [vehicles, setVehicles] = useState<Vehicle[]>(INITIAL_VEHICLES);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>(INITIAL_WAREHOUSES);
+export const DashboardActions = {
+  getStatusClass: (status: ShipmentStatus) => {
+    switch (status) {
+      case 'In Transit': return 'status-intransit';
+      case 'Out for Delivery': return 'status-outfordelivery';
+      case 'Delivered': return 'status-delivered';
+      case 'Delayed': return 'status-delayed';
+      default: return 'status-pending';
+    }
+  },
 
-  const [statusFilter, setStatusFilter] = useState<string>('All');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isSimulatingId, setIsSimulatingId] = useState<string | null>(null);
+  filterShipments: async (
+    filter: string,
+    searchTerm: string,
+    setStatusFilter: (f: string) => void,
+    setShipments: (s: Shipment[]) => void,
+  ) => {
+    setStatusFilter(filter);
+    const filtered = await apiClient.getShipments(filter, searchTerm);
+    setShipments(filtered);
+    return filtered;
+  },
 
-  // New Shipment Form State
-  const [newSender, setNewSender] = useState('');
-  const [newRecipient, setNewRecipient] = useState('');
-  const [newOrigin, setNewOrigin] = useState('Chicago, IL');
-  const [newDestination, setNewDestination] = useState('Rotterdam, NL');
-  const [newPriority, setNewPriority] = useState<ShipmentPriority>('Express');
-  const [newWeight, setNewWeight] = useState(500);
-  const [newDays, setNewDays] = useState(3);
+  searchShipments: async (
+    term: string,
+    statusFilter: string,
+    setSearchTerm: (t: string) => void,
+    setShipments: (s: Shipment[]) => void,
+  ) => {
+    setSearchTerm(term);
+    const searched = await apiClient.getShipments(statusFilter, term);
+    setShipments(searched);
+    return searched;
+  },
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  simulateStep: async (
+    id: string,
+    selectedShipment: Shipment | null,
+    setIsSimulatingId: (id: string | null) => void,
+    setShipments: React.Dispatch<React.SetStateAction<Shipment[]>>,
+    setSelectedShipment: (s: Shipment | null) => void,
+    setAnalytics: (a: LogisticsAnalytics) => void,
+  ) => {
+    setIsSimulatingId(id);
+    try {
+      const updated = await apiClient.simulateNextStep(id);
+      if (updated) {
+        setShipments((prev) => prev.map((s) => (s.id === id ? updated : s)));
+        if (selectedShipment?.id === id) {
+          setSelectedShipment(updated);
+        }
+        const newAnalytics = await apiClient.getAnalytics();
+        setAnalytics(newAnalytics);
+        return updated;
+      }
+    } finally {
+      setIsSimulatingId(null);
+    }
+    return null;
+  },
 
-  const loadData = async () => {
+  createShipment: async (
+    input: CreateShipmentInput,
+    setShipments: React.Dispatch<React.SetStateAction<Shipment[]>>,
+    setIsCreateModalOpen: (open: boolean) => void,
+    setSelectedShipment: (s: Shipment | null) => void,
+  ) => {
+    const created = await apiClient.createShipment(input);
+    setShipments((prev) => [created, ...prev]);
+    setIsCreateModalOpen(false);
+    setSelectedShipment(created);
+    return created;
+  },
+
+  loadData: async (
+    setAnalytics: (a: LogisticsAnalytics) => void,
+    setShipments: (s: Shipment[]) => void,
+    setVehicles: (v: Vehicle[]) => void,
+    setWarehouses: (w: Warehouse[]) => void,
+  ) => {
     try {
       const [fetchedAnalytics, fetchedShipments, fetchedVehicles, fetchedWarehouses] = await Promise.all([
         apiClient.getAnalytics(),
@@ -57,40 +113,103 @@ export function Dashboard({ currentUser }: DashboardProps) {
     } catch {
       // Keep initial fallback data
     }
-  };
+  },
+};
 
-  const handleStatusFilterChange = async (filter: string) => {
-    setStatusFilter(filter);
-    const filtered = await apiClient.getShipments(filter, searchTerm);
-    setShipments(filtered);
-  };
+export const createDashboardHandlers = (
+  setActiveTab: (tab: 'shipments' | 'fleet' | 'warehouses') => void,
+  searchTerm: string,
+  statusFilter: string,
+  setStatusFilter: (f: string) => void,
+  setSearchTerm: (t: string) => void,
+  shipments: Shipment[],
+  selectedShipment: Shipment | null,
+  setIsSimulatingId: (id: string | null) => void,
+  setShipments: React.Dispatch<React.SetStateAction<Shipment[]>>,
+  setSelectedShipment: (s: Shipment | null) => void,
+  setAnalytics: (a: LogisticsAnalytics) => void,
+  setIsCreateModalOpen: (o: boolean) => void,
+  setVehicles: (v: Vehicle[]) => void,
+  setWarehouses: (w: Warehouse[]) => void,
+  newSender: string,
+  newRecipient: string,
+  newOrigin: string,
+  newDestination: string,
+  newPriority: ShipmentPriority,
+  newWeight: number,
+  newDays: number,
+  setNewSender: (s: string) => void,
+  setNewRecipient: (r: string) => void,
+  setNewOrigin: (o: string) => void,
+  setNewDestination: (d: string) => void,
+  setNewPriority: (p: ShipmentPriority) => void,
+  setNewWeight: (w: number) => void,
+  setNewDays: (d: number) => void,
+) => ({
+  onTabShipments: () => setActiveTab('shipments'),
+  onTabFleet: () => setActiveTab('fleet'),
+  onTabWarehouses: () => setActiveTab('warehouses'),
 
-  const handleSearchChange = async (term: string) => {
-    setSearchTerm(term);
-    const searched = await apiClient.getShipments(statusFilter, term);
-    setShipments(searched);
-  };
+  onFilterClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+    const filter = e.currentTarget.getAttribute('data-filter');
+    if (filter) void DashboardActions.filterShipments(filter, searchTerm, setStatusFilter, setShipments);
+  },
 
-  const handleSimulateStep = async (id: string) => {
-    setIsSimulatingId(id);
-    try {
-      const updated = await apiClient.simulateNextStep(id);
-      if (updated) {
-        setShipments((prev) => prev.map((s) => (s.id === id ? updated : s)));
-        if (selectedShipment?.id === id) {
-          setSelectedShipment(updated);
-        }
-        // Refresh analytics
-        const newAnalytics = await apiClient.getAnalytics();
-        setAnalytics(newAnalytics);
-      }
-    } finally {
-      setIsSimulatingId(null);
+  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+    void DashboardActions.searchShipments(e.target.value, statusFilter, setSearchTerm, setShipments);
+  },
+
+  onInspectClick: (e: React.MouseEvent<HTMLElement>) => {
+    const id = e.currentTarget.getAttribute('data-id');
+    const target = shipments.find((s) => s.id === id);
+    if (target) setSelectedShipment(target);
+  },
+
+  onSimulateClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+    const id = e.currentTarget.getAttribute('data-id');
+    if (id) {
+      void DashboardActions.simulateStep(
+        id,
+        selectedShipment,
+        setIsSimulatingId,
+        setShipments,
+        setSelectedShipment,
+        setAnalytics,
+      );
     }
-  };
+  },
 
-  const handleCreateShipment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  onModalSimulateClick: () => {
+    if (selectedShipment) {
+      void DashboardActions.simulateStep(
+        selectedShipment.id,
+        selectedShipment,
+        setIsSimulatingId,
+        setShipments,
+        setSelectedShipment,
+        setAnalytics,
+      );
+    }
+  },
+
+  onOpenCreateModal: () => setIsCreateModalOpen(true),
+  onCloseCreateModal: () => setIsCreateModalOpen(false),
+  onCloseDetailModal: () => setSelectedShipment(null),
+
+  onSyncTelematics: () => {
+    void DashboardActions.loadData(setAnalytics, setShipments, setVehicles, setWarehouses);
+  },
+
+  onSenderChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewSender(e.target.value),
+  onRecipientChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewRecipient(e.target.value),
+  onOriginChange: (e: React.ChangeEvent<HTMLSelectElement>) => setNewOrigin(e.target.value),
+  onDestinationChange: (e: React.ChangeEvent<HTMLSelectElement>) => setNewDestination(e.target.value),
+  onPriorityChange: (e: React.ChangeEvent<HTMLSelectElement>) => setNewPriority(e.target.value as ShipmentPriority),
+  onWeightChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewWeight(Number(e.target.value)),
+  onDaysChange: (e: React.ChangeEvent<HTMLInputElement>) => setNewDays(Number(e.target.value)),
+
+  handleCreateShipment: async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const input: CreateShipmentInput = {
       senderName: newSender || 'LogiPulse Enterprise Client',
       senderAddress: `${newOrigin} Logistics Node`,
@@ -102,26 +221,75 @@ export function Dashboard({ currentUser }: DashboardProps) {
       weightKg: Number(newWeight) || 100,
       estimatedDays: Number(newDays) || 3,
     };
-
-    const created = await apiClient.createShipment(input);
-    setShipments((prev) => [created, ...prev]);
-    setIsCreateModalOpen(false);
-    setSelectedShipment(created);
-
-    // Reset Form
+    await DashboardActions.createShipment(input, setShipments, setIsCreateModalOpen, setSelectedShipment);
     setNewSender('');
     setNewRecipient('');
-  };
+  },
+});
 
-  const getStatusClass = (status: ShipmentStatus) => {
-    switch (status) {
-      case 'In Transit': return 'status-intransit';
-      case 'Out for Delivery': return 'status-outfordelivery';
-      case 'Delivered': return 'status-delivered';
-      case 'Delayed': return 'status-delayed';
-      default: return 'status-pending';
-    }
-  };
+export function Dashboard({
+  currentUser,
+  initialTab = 'shipments',
+  initialSelectedShipment = null,
+  initialCreateModalOpen = false,
+}: DashboardProps) {
+  const [activeTab, setActiveTab] = useState<'shipments' | 'fleet' | 'warehouses'>(initialTab);
+  const [analytics, setAnalytics] = useState<LogisticsAnalytics>(INITIAL_ANALYTICS);
+  const [shipments, setShipments] = useState<Shipment[]>(INITIAL_SHIPMENTS);
+  const [vehicles, setVehicles] = useState<Vehicle[]>(INITIAL_VEHICLES);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>(INITIAL_WAREHOUSES);
+
+  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(initialSelectedShipment);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(initialCreateModalOpen);
+  const [isSimulatingId, setIsSimulatingId] = useState<string | null>(null);
+
+  // New Shipment Form State
+  const [newSender, setNewSender] = useState('');
+  const [newRecipient, setNewRecipient] = useState('');
+  const [newOrigin, setNewOrigin] = useState('Chicago, IL');
+  const [newDestination, setNewDestination] = useState('Rotterdam, NL');
+  const [newPriority, setNewPriority] = useState<ShipmentPriority>('Express');
+  const [newWeight, setNewWeight] = useState(500);
+  const [newDays, setNewDays] = useState(3);
+
+  useEffect(() => {
+    void DashboardActions.loadData(setAnalytics, setShipments, setVehicles, setWarehouses);
+  }, []);
+
+  const handlers = createDashboardHandlers(
+    setActiveTab,
+    searchTerm,
+    statusFilter,
+    setStatusFilter,
+    setSearchTerm,
+    shipments,
+    selectedShipment,
+    setIsSimulatingId,
+    setShipments,
+    setSelectedShipment,
+    setAnalytics,
+    setIsCreateModalOpen,
+    setVehicles,
+    setWarehouses,
+    newSender,
+    newRecipient,
+    newOrigin,
+    newDestination,
+    newPriority,
+    newWeight,
+    newDays,
+    setNewSender,
+    setNewRecipient,
+    setNewOrigin,
+    setNewDestination,
+    setNewPriority,
+    setNewWeight,
+    setNewDays,
+  );
+
+  const getStatusClass = (status: ShipmentStatus) => DashboardActions.getStatusClass(status);
 
   return (
     <div style={{ maxWidth: '1360px', margin: '2rem auto', padding: '0 1.5rem' }} data-testid="dashboard-root">
@@ -143,14 +311,14 @@ export function Dashboard({ currentUser }: DashboardProps) {
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button
             className="secondary-btn"
-            onClick={loadData}
+            onClick={handlers.onSyncTelematics}
             data-testid="btn-refresh-data"
           >
             &#x21bb; Sync Telematics
           </button>
           <button
             className="primary-btn"
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={handlers.onOpenCreateModal}
             data-testid="btn-create-shipment"
           >
             + Register Waybill
@@ -209,7 +377,7 @@ export function Dashboard({ currentUser }: DashboardProps) {
         <button
           className={`nav-btn ${activeTab === 'shipments' ? 'active' : ''}`}
           style={{ padding: '0.75rem 1.25rem', fontSize: '0.95rem' }}
-          onClick={() => setActiveTab('shipments')}
+          onClick={handlers.onTabShipments}
           data-testid="tab-shipments"
         >
           Shipments & Waybills ({shipments.length})
@@ -217,7 +385,7 @@ export function Dashboard({ currentUser }: DashboardProps) {
         <button
           className={`nav-btn ${activeTab === 'fleet' ? 'active' : ''}`}
           style={{ padding: '0.75rem 1.25rem', fontSize: '0.95rem' }}
-          onClick={() => setActiveTab('fleet')}
+          onClick={handlers.onTabFleet}
           data-testid="tab-fleet"
         >
           Fleet & Vehicle Telematics ({vehicles.length})
@@ -225,7 +393,7 @@ export function Dashboard({ currentUser }: DashboardProps) {
         <button
           className={`nav-btn ${activeTab === 'warehouses' ? 'active' : ''}`}
           style={{ padding: '0.75rem 1.25rem', fontSize: '0.95rem' }}
-          onClick={() => setActiveTab('warehouses')}
+          onClick={handlers.onTabWarehouses}
           data-testid="tab-warehouses"
         >
           Warehouse Hubs & Inventory ({warehouses.length})
@@ -247,7 +415,8 @@ export function Dashboard({ currentUser }: DashboardProps) {
                     borderColor: statusFilter === filter ? '#3b82f6' : 'var(--border-subtle)',
                     color: statusFilter === filter ? '#fff' : 'var(--text-secondary)',
                   }}
-                  onClick={() => handleStatusFilterChange(filter)}
+                  data-filter={filter}
+                  onClick={handlers.onFilterClick}
                   data-testid={`filter-${filter.toLowerCase().replace(/\s+/g, '')}`}
                 >
                   {filter}
@@ -262,7 +431,7 @@ export function Dashboard({ currentUser }: DashboardProps) {
                 style={{ width: '100%', paddingLeft: '2.25rem' }}
                 placeholder="Search Waybill, Recipient, Route..."
                 value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
+                onChange={handlers.onSearchChange}
                 data-testid="shipment-search-input"
               />
               <span style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
@@ -296,7 +465,8 @@ export function Dashboard({ currentUser }: DashboardProps) {
                           color: 'var(--accent-cyan)',
                           cursor: 'pointer',
                         }}
-                        onClick={() => setSelectedShipment(s)}
+                        data-id={s.id}
+                        onClick={handlers.onInspectClick}
                       >
                         {s.trackingNumber}
                       </span>
@@ -327,7 +497,8 @@ export function Dashboard({ currentUser }: DashboardProps) {
                     <td>
                       <button
                         className="action-btn-sm"
-                        onClick={() => setSelectedShipment(s)}
+                        data-id={s.id}
+                        onClick={handlers.onInspectClick}
                         data-testid="btn-inspect-waybill"
                       >
                         Inspect
@@ -336,7 +507,8 @@ export function Dashboard({ currentUser }: DashboardProps) {
                         className="action-btn-sm"
                         style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}
                         disabled={isSimulatingId === s.id}
-                        onClick={() => handleSimulateStep(s.id)}
+                        data-id={s.id}
+                        onClick={handlers.onSimulateClick}
                         data-testid="btn-simulate-step"
                         title="Simulate progression to next delivery checkpoint"
                       >
@@ -449,69 +621,69 @@ export function Dashboard({ currentUser }: DashboardProps) {
                 {selectedShipment ? selectedShipment.trackingNumber : 'LP-8924-XQ'}
               </h2>
             </div>
-            <button className="close-btn" onClick={() => setSelectedShipment(null)}>
+            <button className="close-btn" onClick={handlers.onCloseDetailModal}>
               &times;
             </button>
           </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Sender</div>
-                <div style={{ fontWeight: 600 }}>{selectedShipment ? selectedShipment.senderName : 'Apex Semiconductor Mfg'}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{selectedShipment ? selectedShipment.senderAddress : 'Austin, TX'}</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Recipient</div>
-                <div style={{ fontWeight: 600 }}>{selectedShipment ? selectedShipment.recipientName : 'NextGen Robotics Corp'}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{selectedShipment ? selectedShipment.recipientAddress : 'Chicago, IL'}</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Weight & Payload</div>
-                <div style={{ fontWeight: 600 }}>{selectedShipment ? `${selectedShipment.weightKg} kg (${selectedShipment.priority})` : '1450 kg (Express)'}</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Current Status</div>
-                <div style={{ fontWeight: 700, color: '#38bdf8' }}>{selectedShipment ? selectedShipment.status : 'In Transit'}</div>
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem', marginBottom: '1.5rem' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Sender</div>
+              <div style={{ fontWeight: 600 }}>{selectedShipment ? selectedShipment.senderName : 'Apex Semiconductor Mfg'}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{selectedShipment ? selectedShipment.senderAddress : 'Austin, TX'}</div>
             </div>
-
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Telemetry Audit Trail
-              </div>
-              <div className="timeline">
-                {(selectedShipment ? selectedShipment.events : [
-                  { id: '1', status: 'In Transit', location: 'Highway Waypoint', description: 'Normal telemetry scan.', timestamp: 'Just now' },
-                ]).map((evt) => (
-                  <div key={evt.id} className="timeline-step">
-                    <div className="timeline-dot" />
-                    <div className="timeline-content">
-                      <div className="timeline-status">
-                        {evt.status} &bull; <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{evt.location}</span>
-                      </div>
-                      <div className="timeline-desc">{evt.description}</div>
-                      <div className="timeline-meta">{evt.timestamp}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.85rem', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Recipient</div>
+              <div style={{ fontWeight: 600 }}>{selectedShipment ? selectedShipment.recipientName : 'NextGen Robotics Corp'}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{selectedShipment ? selectedShipment.recipientAddress : 'Chicago, IL'}</div>
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
-              <button
-                className="primary-btn"
-                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-                onClick={() => selectedShipment && handleSimulateStep(selectedShipment.id)}
-                disabled={selectedShipment ? isSimulatingId === selectedShipment.id : false}
-              >
-                {selectedShipment && isSimulatingId === selectedShipment.id ? 'Advancing Telemetry...' : 'Simulate Next Checkpoint \u25b6'}
-              </button>
-              <button className="secondary-btn" onClick={() => setSelectedShipment(null)}>
-                Dismiss
-              </button>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Weight & Payload</div>
+              <div style={{ fontWeight: 600 }}>{selectedShipment ? `${selectedShipment.weightKg} kg (${selectedShipment.priority})` : '1450 kg (Express)'}</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Current Status</div>
+              <div style={{ fontWeight: 700, color: '#38bdf8' }}>{selectedShipment ? selectedShipment.status : 'In Transit'}</div>
             </div>
           </div>
+
+          <div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+              Telemetry Audit Trail
+            </div>
+            <div className="timeline">
+              {(selectedShipment ? selectedShipment.events : [
+                { id: '1', status: 'In Transit', location: 'Highway Waypoint', description: 'Normal telemetry scan.', timestamp: 'Just now' },
+              ]).map((evt) => (
+                <div key={evt.id} className="timeline-step">
+                  <div className="timeline-dot" />
+                  <div className="timeline-content">
+                    <div className="timeline-status">
+                      {evt.status} &bull; <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{evt.location}</span>
+                    </div>
+                    <div className="timeline-desc">{evt.description}</div>
+                    <div className="timeline-meta">{evt.timestamp}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
+            <button
+              className="primary-btn"
+              style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+              onClick={handlers.onModalSimulateClick}
+              disabled={selectedShipment ? isSimulatingId === selectedShipment.id : false}
+            >
+              {selectedShipment && isSimulatingId === selectedShipment.id ? 'Advancing Telemetry...' : 'Simulate Next Checkpoint \u25b6'}
+            </button>
+            <button className="secondary-btn" onClick={handlers.onCloseDetailModal}>
+              Dismiss
+            </button>
+          </div>
         </div>
+      </div>
 
       {/* MODAL: CREATE NEW SHIPMENT */}
       <div
@@ -522,124 +694,124 @@ export function Dashboard({ currentUser }: DashboardProps) {
         <div className="modal-content">
           <div className="modal-header">
             <h2 className="modal-title">Register New Freight Waybill</h2>
-            <button className="close-btn" onClick={() => setIsCreateModalOpen(false)}>
+            <button className="close-btn" onClick={handlers.onCloseCreateModal}>
               &times;
             </button>
           </div>
 
-            <form onSubmit={handleCreateShipment}>
+          <form onSubmit={handlers.handleCreateShipment}>
+            <div className="form-group">
+              <label className="form-label">Sender Enterprise Name</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. Apex Semi Labs"
+                value={newSender}
+                onChange={handlers.onSenderChange}
+                required
+                data-testid="input-sender"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Recipient Consignee Name</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. NextGen Robotics Ltd"
+                value={newRecipient}
+                onChange={handlers.onRecipientChange}
+                required
+                data-testid="input-recipient"
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
               <div className="form-group">
-                <label className="form-label">Sender Enterprise Name</label>
+                <label className="form-label">Origin Hub</label>
+                <select
+                  className="form-select"
+                  value={newOrigin}
+                  onChange={handlers.onOriginChange}
+                >
+                  <option value="Chicago, IL">Chicago Central (US)</option>
+                  <option value="Rotterdam, NL">Rotterdam Euro Gateway (NL)</option>
+                  <option value="Dallas, TX">Dallas Inland Port (US)</option>
+                  <option value="Singapore, SG">Singapore Freight Terminal (SG)</option>
+                  <option value="Frankfurt, DE">Frankfurt CargoCity (DE)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Destination Node</label>
+                <select
+                  className="form-select"
+                  value={newDestination}
+                  onChange={handlers.onDestinationChange}
+                >
+                  <option value="Rotterdam, NL">Rotterdam Euro Gateway (NL)</option>
+                  <option value="Chicago, IL">Chicago Central (US)</option>
+                  <option value="Dallas, TX">Dallas Inland Port (US)</option>
+                  <option value="Singapore, SG">Singapore Freight Terminal (SG)</option>
+                  <option value="Amsterdam, NL">Amsterdam Metro Center (NL)</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Priority</label>
+                <select
+                  className="form-select"
+                  value={newPriority}
+                  onChange={handlers.onPriorityChange}
+                >
+                  <option value="Standard">Standard</option>
+                  <option value="Express">Express</option>
+                  <option value="Overnight">Overnight</option>
+                  <option value="Cold Chain">Cold Chain (-20°C)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Weight (kg)</label>
                 <input
-                  type="text"
+                  type="number"
                   className="form-input"
-                  placeholder="e.g. Apex Semi Labs"
-                  value={newSender}
-                  onChange={(e) => setNewSender(e.target.value)}
-                  required
-                  data-testid="input-sender"
+                  value={newWeight}
+                  onChange={handlers.onWeightChange}
+                  min={1}
                 />
               </div>
-
               <div className="form-group">
-                <label className="form-label">Recipient Consignee Name</label>
+                <label className="form-label">Est. Days</label>
                 <input
-                  type="text"
+                  type="number"
                   className="form-input"
-                  placeholder="e.g. NextGen Robotics Ltd"
-                  value={newRecipient}
-                  onChange={(e) => setNewRecipient(e.target.value)}
-                  required
-                  data-testid="input-recipient"
+                  value={newDays}
+                  onChange={handlers.onDaysChange}
+                  min={1}
                 />
               </div>
+            </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Origin Hub</label>
-                  <select
-                    className="form-select"
-                    value={newOrigin}
-                    onChange={(e) => setNewOrigin(e.target.value)}
-                  >
-                    <option value="Chicago, IL">Chicago Central (US)</option>
-                    <option value="Rotterdam, NL">Rotterdam Euro Gateway (NL)</option>
-                    <option value="Dallas, TX">Dallas Inland Port (US)</option>
-                    <option value="Singapore, SG">Singapore Freight Terminal (SG)</option>
-                    <option value="Frankfurt, DE">Frankfurt CargoCity (DE)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Destination Node</label>
-                  <select
-                    className="form-select"
-                    value={newDestination}
-                    onChange={(e) => setNewDestination(e.target.value)}
-                  >
-                    <option value="Rotterdam, NL">Rotterdam Euro Gateway (NL)</option>
-                    <option value="Chicago, IL">Chicago Central (US)</option>
-                    <option value="Dallas, TX">Dallas Inland Port (US)</option>
-                    <option value="Singapore, SG">Singapore Freight Terminal (SG)</option>
-                    <option value="Amsterdam, NL">Amsterdam Metro Center (NL)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Priority</label>
-                  <select
-                    className="form-select"
-                    value={newPriority}
-                    onChange={(e) => setNewPriority(e.target.value as ShipmentPriority)}
-                  >
-                    <option value="Standard">Standard</option>
-                    <option value="Express">Express</option>
-                    <option value="Overnight">Overnight</option>
-                    <option value="Cold Chain">Cold Chain (-20°C)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Weight (kg)</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={newWeight}
-                    onChange={(e) => setNewWeight(Number(e.target.value))}
-                    min={1}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Est. Days</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={newDays}
-                    onChange={(e) => setNewDays(Number(e.target.value))}
-                    min={1}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => setIsCreateModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="primary-btn"
-                  data-testid="submit-new-shipment"
-                >
-                  Confirm & Issue Waybill
-                </button>
-              </div>
-            </form>
-          </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={handlers.onCloseCreateModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary-btn"
+                data-testid="submit-new-shipment"
+              >
+                Confirm & Issue Waybill
+              </button>
+            </div>
+          </form>
         </div>
+      </div>
     </div>
   );
 }
