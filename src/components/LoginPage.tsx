@@ -6,22 +6,24 @@ import { DEMO_USERS } from '../data/mockLogisticsData';
 export interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
   onNavigateToHome: () => void;
+  initialEmail?: string;
+  initialPassword?: string;
+  initialError?: string | null;
 }
 
-export function LoginPage({ onLoginSuccess, onNavigateToHome }: LoginPageProps) {
-  const [email, setEmail] = useState('dispatcher@logipulse.io');
-  const [password, setPassword] = useState('password123');
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+export const LoginPageActions = {
+  performLogin: async (
+    email: string,
+    pass: string,
+    setLoading: (l: boolean) => void,
+    setError: (err: string | null) => void,
+    onSuccess: (user: UserProfile) => void,
+  ) => {
     setError(null);
-    setIsLoading(true);
-
+    setLoading(true);
     try {
-      const user = await apiClient.login(email, password);
-      onLoginSuccess(user);
+      const user = await apiClient.login(email, pass);
+      onSuccess(user);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -29,15 +31,66 @@ export function LoginPage({ onLoginSuccess, onNavigateToHome }: LoginPageProps) 
         setError('Authentication failure.');
       }
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  },
 
-  const handleSelectDemo = (demoEmail: string) => {
+  selectDemoProfile: (
+    demoEmail: string,
+    setEmail: (e: string) => void,
+    setPassword: (p: string) => void,
+    setError: (err: string | null) => void,
+  ) => {
     setEmail(demoEmail);
     setPassword('password123');
     setError(null);
-  };
+  },
+};
+
+export const createLoginHandlers = (
+  email: string,
+  pass: string,
+  setIsLoading: (l: boolean) => void,
+  setError: (e: string | null) => void,
+  onLoginSuccess: (u: UserProfile) => void,
+  setEmail: (e: string) => void,
+  setPassword: (p: string) => void,
+) => ({
+  onEmailChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value),
+  onPasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value),
+  handleSubmit: async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    await LoginPageActions.performLogin(email, pass, setIsLoading, setError, onLoginSuccess);
+  },
+  onSelectDemoClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+    const demoEmail = e.currentTarget.getAttribute('data-email');
+    if (demoEmail) {
+      LoginPageActions.selectDemoProfile(demoEmail, setEmail, setPassword, setError);
+    }
+  },
+});
+
+export function LoginPage({
+  onLoginSuccess,
+  onNavigateToHome,
+  initialEmail = 'dispatcher@logipulse.io',
+  initialPassword = 'password123',
+  initialError = null,
+}: LoginPageProps) {
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState(initialPassword);
+  const [error, setError] = useState<string | null>(initialError);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handlers = createLoginHandlers(
+    email,
+    password,
+    setIsLoading,
+    setError,
+    onLoginSuccess,
+    setEmail,
+    setPassword,
+  );
 
   return (
     <div
@@ -91,7 +144,7 @@ export function LoginPage({ onLoginSuccess, onNavigateToHome }: LoginPageProps) 
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handlers.handleSubmit}>
           <div className="form-group">
             <label className="form-label" htmlFor="login-email-input">
               Work Email Address
@@ -102,7 +155,7 @@ export function LoginPage({ onLoginSuccess, onNavigateToHome }: LoginPageProps) 
               className="form-input"
               placeholder="e.g. dispatcher@logipulse.io"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handlers.onEmailChange}
               required
               data-testid="login-email"
             />
@@ -118,7 +171,7 @@ export function LoginPage({ onLoginSuccess, onNavigateToHome }: LoginPageProps) 
               className="form-input"
               placeholder="••••••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={handlers.onPasswordChange}
               required
               data-testid="login-password"
             />
@@ -150,7 +203,8 @@ export function LoginPage({ onLoginSuccess, onNavigateToHome }: LoginPageProps) 
                 key={user.id}
                 type="button"
                 className="demo-account-btn"
-                onClick={() => handleSelectDemo(user.email)}
+                data-email={user.email}
+                onClick={handlers.onSelectDemoClick}
                 data-testid={`demo-${user.role.toLowerCase()}`}
               >
                 <span className="demo-role">{user.role}</span>

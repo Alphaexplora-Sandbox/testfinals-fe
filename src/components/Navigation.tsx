@@ -10,6 +10,16 @@ export interface NavigationProps {
   serviceTitle?: string;
 }
 
+export const createNavHandlers = (onNavigate: (view: 'landing' | 'login' | 'dashboard') => void) => ({
+  toLanding: () => onNavigate('landing'),
+  toDashboard: () => onNavigate('dashboard'),
+  toLogin: () => onNavigate('login'),
+});
+
+export const NavigationActions = {
+  createHandlers: createNavHandlers,
+};
+
 export function Navigation({
   currentView,
   onNavigate,
@@ -18,11 +28,13 @@ export function Navigation({
   isBackendConnected,
   serviceTitle = 'LogiPulse',
 }: NavigationProps) {
+  const handlers = createNavHandlers(onNavigate);
+
   return (
     <header className="header-nav" data-testid="main-header">
       <div
         className="brand-badge"
-        onClick={() => onNavigate('landing')}
+        onClick={handlers.toLanding}
         role="button"
         tabIndex={0}
         data-testid="brand-logo"
@@ -39,14 +51,14 @@ export function Navigation({
       <nav className="nav-links">
         <button
           className={`nav-btn ${currentView === 'landing' ? 'active' : ''}`}
-          onClick={() => onNavigate('landing')}
+          onClick={handlers.toLanding}
           data-testid="nav-home"
         >
           Track & Overview
         </button>
         <button
           className={`nav-btn ${currentView === 'dashboard' ? 'active' : ''}`}
-          onClick={() => onNavigate('dashboard')}
+          onClick={handlers.toDashboard}
           data-testid="nav-dashboard"
         >
           Command Center
@@ -90,7 +102,7 @@ export function Navigation({
           <button
             className="primary-btn"
             style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
-            onClick={() => onNavigate('login')}
+            onClick={handlers.toLogin}
             data-testid="nav-login-btn"
           >
             Portal Sign In

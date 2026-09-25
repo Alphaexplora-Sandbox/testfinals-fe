@@ -6,48 +6,97 @@ export interface LandingPageProps {
   onNavigateToLogin: () => void;
   onNavigateToDashboard: () => void;
   initialTrackingCode?: string;
+  initialSearchedShipment?: Shipment | null;
+  initialSearchError?: string | null;
 }
+
+export const LandingPageActions = {
+  performTrack: async (
+    code: string,
+    setSearching: (s: boolean) => void,
+    setError: (err: string | null) => void,
+    setShipment: (s: Shipment | null) => void,
+  ) => {
+    if (!code.trim()) return;
+    setSearching(true);
+    setError(null);
+    try {
+      const result = await apiClient.trackShipment(code.trim());
+      if (result) {
+        setShipment(result);
+      } else {
+        setError(`Tracking code "${code}" was not found in active telematics.`);
+        setShipment(null);
+      }
+    } catch {
+      setError('Error contacting logistics telematics service.');
+    } finally {
+      setSearching(false);
+    }
+  },
+
+  quickLookup: async (
+    code: string,
+    setCode: (c: string) => void,
+    setSearching: (s: boolean) => void,
+    setError: (err: string | null) => void,
+    setShipment: (s: Shipment | null) => void,
+  ) => {
+    setCode(code);
+    setSearching(true);
+    setError(null);
+    try {
+      const result = await apiClient.trackShipment(code);
+      setShipment(result);
+    } finally {
+      setSearching(false);
+    }
+  },
+};
+
+export const createLandingHandlers = (
+  trackingCode: string,
+  setTrackingCode: (val: string) => void,
+  setIsSearching: (s: boolean) => void,
+  setSearchError: (err: string | null) => void,
+  setSearchedShipment: (s: Shipment | null) => void,
+) => ({
+  onTrackingChange: (e: React.ChangeEvent<HTMLInputElement>) => setTrackingCode(e.target.value),
+  handleTrack: async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    await LandingPageActions.performTrack(trackingCode, setIsSearching, setSearchError, setSearchedShipment);
+  },
+  handleQuickLookup: async (code: string) => {
+    await LandingPageActions.quickLookup(code, setTrackingCode, setIsSearching, setSearchError, setSearchedShipment);
+  },
+  onQuickButtonClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+    const code = e.currentTarget.getAttribute('data-code');
+    if (code) {
+      void LandingPageActions.quickLookup(code, setTrackingCode, setIsSearching, setSearchError, setSearchedShipment);
+    }
+  },
+  handleCloseModal: () => setSearchedShipment(null),
+});
 
 export function LandingPage({
   onNavigateToLogin,
   onNavigateToDashboard,
   initialTrackingCode = '',
+  initialSearchedShipment = null,
+  initialSearchError = null,
 }: LandingPageProps) {
   const [trackingCode, setTrackingCode] = useState(initialTrackingCode);
-  const [searchedShipment, setSearchedShipment] = useState<Shipment | null>(null);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchedShipment, setSearchedShipment] = useState<Shipment | null>(initialSearchedShipment);
+  const [searchError, setSearchError] = useState<string | null>(initialSearchError);
   const [isSearching, setIsSearching] = useState(false);
 
-  const handleTrack = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!trackingCode.trim()) return;
-
-    setIsSearching(true);
-    setSearchError(null);
-    try {
-      const result = await apiClient.trackShipment(trackingCode.trim());
-      if (result) {
-        setSearchedShipment(result);
-      } else {
-        setSearchError(`Tracking code "${trackingCode}" was not found in active telematics.`);
-        setSearchedShipment(null);
-      }
-    } catch {
-      setSearchError('Error contacting logistics telematics service.');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleQuickLookup = (code: string) => {
-    setTrackingCode(code);
-    setIsSearching(true);
-    setSearchError(null);
-    apiClient.trackShipment(code).then((result) => {
-      setSearchedShipment(result);
-      setIsSearching(false);
-    });
-  };
+  const handlers = createLandingHandlers(
+    trackingCode,
+    setTrackingCode,
+    setIsSearching,
+    setSearchError,
+    setSearchedShipment,
+  );
 
   return (
     <div data-testid="landing-page-root">
@@ -64,7 +113,7 @@ export function LandingPage({
         </p>
 
         {/* Live Tracking Input Box */}
-        <form className="tracking-search-card" onSubmit={handleTrack}>
+        <form className="tracking-search-card" onSubmit={handlers.handleTrack}>
           <svg
             width="22"
             height="22"
@@ -83,7 +132,7 @@ export function LandingPage({
             className="tracking-input"
             placeholder="Enter Waybill or Tracking # (e.g. LP-8924-XQ)"
             value={trackingCode}
-            onChange={(e) => setTrackingCode(e.target.value)}
+            onChange={handlers.onTrackingChange}
             data-testid="hero-tracking-input"
           />
           <button
@@ -105,7 +154,8 @@ export function LandingPage({
               type="button"
               className="action-btn-sm"
               style={{ fontFamily: 'monospace', fontWeight: 600 }}
-              onClick={() => handleQuickLookup(code)}
+              data-code={code}
+              onClick={handlers.onQuickButtonClick}
               data-testid={`quick-code-${code}`}
             >
               {code}
@@ -154,7 +204,7 @@ export function LandingPage({
             </div>
             <button
               className="close-btn"
-              onClick={() => setSearchedShipment(null)}
+              onClick={handlers.handleCloseModal}
               data-testid="btn-close-modal"
             >
               &times;
@@ -209,7 +259,7 @@ export function LandingPage({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-            <button className="secondary-btn" onClick={() => setSearchedShipment(null)}>
+            <button className="secondary-btn" onClick={handlers.handleCloseModal}>
               Dismiss
             </button>
           </div>
