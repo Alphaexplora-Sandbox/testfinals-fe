@@ -208,26 +208,29 @@ export function generateHtml(initialPath: string = '/'): string {
 </html>`;
 }
 
-export function startServer(port: number = PORT): http.Server {
-  const server = http.createServer((req, res) => {
-    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-    const pathname = url.pathname;
+export function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const host = req.headers.host || 'localhost';
+  const url = new URL(req.url || '/', `http://${host}`);
+  const pathname = url.pathname;
 
-    // Health check endpoint
-    if (pathname === '/health' || pathname === '/api/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', service: 'testfinals-frontend' }));
-      return;
-    }
+  // Health check endpoint
+  if (pathname === '/health' || pathname === '/api/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', service: 'testfinals-frontend' }));
+    return;
+  }
 
-    // Serve HTML
-    const html = generateHtml(pathname);
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-cache',
-    });
-    res.end(html);
+  // Serve HTML
+  const html = generateHtml(pathname);
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-cache',
   });
+  res.end(html);
+}
+
+export function startServer(port: number = PORT): http.Server {
+  const server = http.createServer(handleRequest);
 
   server.listen(port, () => {
     console.log(`LogiPulse Frontend listening at http://localhost:${port}`);
@@ -235,3 +238,4 @@ export function startServer(port: number = PORT): http.Server {
 
   return server;
 }
+
