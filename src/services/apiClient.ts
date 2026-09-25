@@ -30,6 +30,30 @@ let localShipments: Shipment[] = [...INITIAL_SHIPMENTS];
 const localVehicles: Vehicle[] = [...INITIAL_VEHICLES];
 const localWarehouses: Warehouse[] = [...INITIAL_WAREHOUSES];
 
+function generateSecureSuffix(): string {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint8Array(4);
+    crypto.getRandomValues(array);
+    return Array.from(array, (b) => b.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()
+      .slice(0, 4);
+  }
+  return Date.now().toString(36).slice(-4).toUpperCase();
+}
+
+function generateSecureTrackingCode(): string {
+  let num = 1000;
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    num = 1000 + (array[0] % 9000);
+  } else {
+    num = 1000 + (Date.now() % 9000);
+  }
+  return `LP-${num}-${generateSecureSuffix()}`;
+}
+
 export const apiClient = {
   async checkHealth(): Promise<{ online: boolean; service?: string }> {
     try {
@@ -82,12 +106,15 @@ export const apiClient = {
 
   async getShipments(status?: string, search?: string): Promise<Shipment[]> {
     try {
-      const params = new URLSearchParams();
-      if (status && status !== 'All') params.set('status', status);
-      if (search) params.set('search', search);
+      const apiUrl = new URL('/api/v1/shipments', getApiBaseUrl());
+      if (status && status !== 'All') {
+        apiUrl.searchParams.set('status', encodeURIComponent(status.trim().slice(0, 50)));
+      }
+      if (search) {
+        apiUrl.searchParams.set('search', encodeURIComponent(search.trim().slice(0, 100)));
+      }
 
-      const url = `${getApiBaseUrl()}/api/v1/shipments?${params.toString()}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      const res = await fetch(apiUrl.toString(), { signal: AbortSignal.timeout(2000) });
       if (res.ok) {
         const data = await res.json();
         localShipments = data;
@@ -115,8 +142,10 @@ export const apiClient = {
   },
 
   async trackShipment(trackingNumber: string): Promise<Shipment | null> {
+    const safeTracking = encodeURIComponent(trackingNumber.trim().slice(0, 50));
     try {
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/shipments/track/${encodeURIComponent(trackingNumber)}`, {
+      const trackUrl = new URL(`/api/v1/shipments/track/${safeTracking}`, getApiBaseUrl());
+      const res = await fetch(trackUrl.toString(), {
         signal: AbortSignal.timeout(2000),
       });
       if (res.ok) {
@@ -149,8 +178,7 @@ export const apiClient = {
       // Fallback
     }
 
-    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const trackingCode = `LP-${Math.floor(1000 + Math.random() * 9000)}-${randomSuffix}`;
+    const trackingCode = generateSecureTrackingCode();
     const newShipment: Shipment = {
       id: `shp-${Date.now()}`,
       trackingNumber: trackingCode,

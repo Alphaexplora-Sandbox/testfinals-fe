@@ -70,7 +70,7 @@ export const createLandingHandlers = (
     await LandingPageActions.quickLookup(code, setTrackingCode, setIsSearching, setSearchError, setSearchedShipment);
   },
   onQuickButtonClick: (e: React.MouseEvent<HTMLButtonElement>) => {
-    const code = e.currentTarget.getAttribute('data-code');
+    const code = e.currentTarget.dataset.code;
     if (code) {
       void LandingPageActions.quickLookup(code, setTrackingCode, setIsSearching, setSearchError, setSearchedShipment);
     }
@@ -78,13 +78,14 @@ export const createLandingHandlers = (
   handleCloseModal: () => setSearchedShipment(null),
 });
 
-export function LandingPage({
-  onNavigateToLogin,
-  onNavigateToDashboard,
-  initialTrackingCode = '',
-  initialSearchedShipment = null,
-  initialSearchError = null,
-}: LandingPageProps) {
+export function LandingPage(props: Readonly<LandingPageProps>) {
+  const {
+    onNavigateToLogin,
+    onNavigateToDashboard,
+    initialTrackingCode = '',
+    initialSearchedShipment = null,
+    initialSearchError = null,
+  } = props;
   const [trackingCode, setTrackingCode] = useState(initialTrackingCode);
   const [searchedShipment, setSearchedShipment] = useState<Shipment | null>(initialSearchedShipment);
   const [searchError, setSearchError] = useState<string | null>(initialSearchError);

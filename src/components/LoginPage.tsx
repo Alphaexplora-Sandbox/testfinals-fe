@@ -63,20 +63,21 @@ export const createLoginHandlers = (
     await LoginPageActions.performLogin(email, pass, setIsLoading, setError, onLoginSuccess);
   },
   onSelectDemoClick: (e: React.MouseEvent<HTMLButtonElement>) => {
-    const demoEmail = e.currentTarget.getAttribute('data-email');
+    const demoEmail = e.currentTarget.dataset.email;
     if (demoEmail) {
       LoginPageActions.selectDemoProfile(demoEmail, setEmail, setPassword, setError);
     }
   },
 });
 
-export function LoginPage({
-  onLoginSuccess,
-  onNavigateToHome,
-  initialEmail = 'dispatcher@logipulse.io',
-  initialPassword = 'password123',
-  initialError = null,
-}: LoginPageProps) {
+export function LoginPage(props: Readonly<LoginPageProps>) {
+  const {
+    onLoginSuccess,
+    onNavigateToHome,
+    initialEmail = 'dispatcher@logipulse.io',
+    initialPassword = 'password123',
+    initialError = null,
+  } = props;
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState(initialPassword);
   const [error, setError] = useState<string | null>(initialError);

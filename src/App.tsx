@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from './types/logistics';
-import { Navigation } from './components/Navigation';
+import { Navigation, AppView } from './components/Navigation';
 import { LandingPage } from './components/LandingPage';
 import { LoginPage } from './components/LoginPage';
 import { Dashboard } from './components/Dashboard';
@@ -9,7 +9,7 @@ import { apiClient } from './services/apiClient';
 
 export interface AppProps {
   title?: string;
-  initialView?: 'landing' | 'login' | 'dashboard';
+  initialView?: AppView;
 }
 
 export const AppActions = {
@@ -81,8 +81,9 @@ export const createAppHandlers = (
   toDashboard: () => AppActions.handleNavigate('dashboard', setCurrentView),
 });
 
-export function App({ title = 'testfinals-frontend', initialView = 'landing' }: AppProps) {
-  const [currentView, setCurrentView] = useState<'landing' | 'login' | 'dashboard'>(initialView);
+export function App(props: Readonly<AppProps>) {
+  const { title = 'testfinals-frontend', initialView = 'landing' } = props;
+  const [currentView, setCurrentView] = useState<AppView>(initialView);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isBackendConnected, setIsBackendConnected] = useState(false);
 
